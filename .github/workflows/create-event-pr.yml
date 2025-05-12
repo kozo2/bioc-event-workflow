@@ -75,7 +75,7 @@ jobs:
           # Create a Pull Request
           # You can assign reviewers (e.g., Lori) and add labels.
           gh pr create \
-            --base main \ # Or your default branch (e.g., master)
+            --base main \
             --head "$BRANCH_NAME" \
             --title "New Event Submission: $EVENT_TITLE" \
             --body "This Pull Request adds a new event submitted via the Google Form.
@@ -86,6 +86,4 @@ jobs:
             Submitted by: $SUBMITTER_EMAIL (if available)
             Original Google Sheet Row: $SHEET_ROW
             
-            Please review and merge.
-            cc @LoriGitHubUsername" # <<< REPLACE with Lori's GitHub username for notification
-            # --assignee "LoriGitHubUsername" # <<< REPLACE and uncomment to assign Lori
+            Please review and merge."
