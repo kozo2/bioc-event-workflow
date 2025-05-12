@@ -4,7 +4,7 @@
 
 1.  **Open Your Google Sheet:** The one linked to your Google Form.
 2.  **Open Apps Script Editor:** Go to "Extensions" > "Apps Script".
-3.  **Paste the Code:** Delete any default `Code.gs` content and paste the entire script above.
+3.  **Paste the Code:** Delete any default `Code.gs` content and paste the [event_manager.gs](https://github.com/kozo2/bioc-event-workflow/blob/main/event_manager.gs) script code.
 4.  **IMPORTANT: Configure Constants:**
     * Carefully edit the values in the `CONFIGURATION` section at the top of the script:
         * `SHEET_NAME` (if it's not `"Form Responses 1"`)
