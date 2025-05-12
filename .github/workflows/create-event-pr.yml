@@ -86,8 +86,3 @@ jobs:
             Please review and merge.
             cc @LoriGitHubUsername" # <<< REPLACE with Lori's GitHub username for notification
             # --assignee "LoriGitHubUsername" # <<< REPLACE and uncomment to assign Lori
-
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This is a special token provided by GitHub Actions
-
-      # Optional: Add a step to clean up the branch after PR is merged/closed if desired (more advanced)
