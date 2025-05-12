@@ -1,0 +1,93 @@
+name: Create Event PR from Google Form Submission
+
+on:
+  repository_dispatch:
+    types: [new-event-for-website] # <<< MUST MATCH GITHUB_ACTION_EVENT_TYPE in Apps Script
+
+jobs:
+  create_pull_request:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Print Event Payload (for debugging)
+        run: |
+          echo "Event triggered by: ${{ github.event.action }}"
+          echo "Client payload:"
+          echo "${{ toJSON(github.event.client_payload) }}"
+
+      - name: Setup Git User
+        run: |
+          git config --global user.name 'Bioconductor Event Bot'
+          git config --global user.email 'actions@github.com' # Or a noreply email
+
+      - name: Create Event File and PR
+        env:
+          EVENT_TITLE: ${{ github.event.client_payload.title }}
+          EVENT_DATE: ${{ github.event.client_payload.date }}
+          START_TIME: ${{ github.event.client_payload.startTime }}
+          END_TIME: ${{ github.event.client_payload.endTime }}
+          DESCRIPTION: ${{ github.event.client_payload.description }}
+          LOCATION: ${{ github.event.client_payload.location }}
+          SUBMITTER_EMAIL: ${{ github.event.client_payload.submitterEmail }}
+          SHEET_ROW: ${{ github.event.client_payload.googleSheetRow }}
+          # Add other env vars for any other data you pass in client_payload
+        run: |
+          # Sanitize title for filename and branch name
+          # Lowercase, replace spaces and special characters with hyphens
+          SAFE_TITLE=$(echo "$EVENT_TITLE" | iconv -t ascii//TRANSLIT | sed -r s/[^a-zA-Z0-9]+/-/g | sed -r s/^-+\|-+$//g | tr A-Z a-z)
+          BRANCH_NAME="event/${EVENT_DATE}-${SAFE_TITLE}-row-${SHEET_ROW}"
+          
+          # Create a new branch
+          git checkout -b $BRANCH_NAME
+          
+          # --- THIS IS WHERE YOU CUSTOMIZE THE FILE CONTENT AND STRUCTURE ---
+          # Example: Creating a Markdown file for a Hugo-like static site generator
+          # Adjust the path and content to your website's needs.
+          FILE_PATH="content/events/${EVENT_DATE}-${SAFE_TITLE}.md" # Example path
+          
+          mkdir -p $(dirname "$FILE_PATH") # Ensure directory exists
+          
+          # Create the event file content
+          # Use printf for better handling of multi-line descriptions and special characters
+          printf -- '---\n' > "$FILE_PATH"
+          printf 'title: "%s"\n' "$EVENT_TITLE" >> "$FILE_PATH"
+          printf 'date: %s\n' "$EVENT_DATE" >> "$FILE_PATH"
+          printf 'startTime: "%s"\n' "$START_TIME" >> "$FILE_PATH"
+          printf 'endTime: "%s"\n' "$END_TIME" >> "$FILE_PATH"
+          printf 'location: "%s"\n' "$LOCATION" >> "$FILE_PATH"
+          # Add any other frontmatter fields you need
+          printf 'sourceSheetRow: %s\n' "$SHEET_ROW" >> "$FILE_PATH" # For traceability
+          printf -- '---\n\n' >> "$FILE_PATH"
+          printf '%s\n' "$DESCRIPTION" >> "$FILE_PATH"
+          
+          echo "Created event file: $FILE_PATH"
+          
+          # Add, commit, and push the new file to the new branch
+          git add "$FILE_PATH"
+          git commit -m "Add event: $EVENT_TITLE (from Google Form row $SHEET_ROW)"
+          git push origin $BRANCH_NAME
+          
+          # Create a Pull Request
+          # You can assign reviewers (e.g., Lori) and add labels.
+          gh pr create \
+            --base main \ # Or your default branch (e.g., master)
+            --head "$BRANCH_NAME" \
+            --title "New Event Submission: $EVENT_TITLE" \
+            --body "This Pull Request adds a new event submitted via the Google Form.
+            Event Title: $EVENT_TITLE
+            Date: $EVENT_DATE
+            Location: $LOCATION
+            
+            Submitted by: $SUBMITTER_EMAIL (if available)
+            Original Google Sheet Row: $SHEET_ROW
+            
+            Please review and merge.
+            cc @LoriGitHubUsername" # <<< REPLACE with Lori's GitHub username for notification
+            # --assignee "LoriGitHubUsername" # <<< REPLACE and uncomment to assign Lori
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This is a special token provided by GitHub Actions
+
+      # Optional: Add a step to clean up the branch after PR is merged/closed if desired (more advanced)
