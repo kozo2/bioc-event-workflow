@@ -2,7 +2,10 @@ name: Create Event PR from Google Form Submission
 
 on:
   repository_dispatch:
-    types: [new-event-for-website] # <<< MUST MATCH GITHUB_ACTION_EVENT_TYPE in Apps Script
+    types: new-event-for-website # <<< MUST MATCH GITHUB_ACTION_EVENT_TYPE in Apps Script
+
+permissions:
+  contents: write   # allow push via GITHUB_TOKEN
 
 jobs:
   create_pull_request:
