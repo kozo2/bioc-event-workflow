@@ -36,6 +36,7 @@ jobs:
           SUBMITTER_EMAIL: ${{ github.event.client_payload.submitterEmail }}
           SHEET_ROW: ${{ github.event.client_payload.googleSheetRow }}
           # Add other env vars for any other data you pass in client_payload
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Sanitize title for filename and branch name
           # Lowercase, replace spaces and special characters with hyphens
