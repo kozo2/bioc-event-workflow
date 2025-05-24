@@ -29,9 +29,8 @@ jobs:
       - name: Create Event File and PR
         env:
           EVENT_TITLE: ${{ github.event.client_payload.title }}
-          EVENT_DATE: ${{ github.event.client_payload.date }}
-          START_TIME: ${{ github.event.client_payload.startTime }}
-          END_TIME: ${{ github.event.client_payload.endTime }}
+          START_DATE_TIME: ${{ github.event.client_payload.startDateTime }}
+          END_DATE_TIME: ${{ github.event.client_payload.endDateTime }}
           DESCRIPTION: ${{ github.event.client_payload.description }}
           LOCATION: ${{ github.event.client_payload.location }}
           SUBMITTER_EMAIL: ${{ github.event.client_payload.submitterEmail }}
@@ -60,9 +59,8 @@ jobs:
           # Use printf for better handling of multi-line descriptions and special characters
           printf -- '---\n' > "$FILE_PATH"
           printf 'title: "%s"\n' "$EVENT_TITLE" >> "$FILE_PATH"
-          printf 'date: %s\n' "$EVENT_DATE" >> "$FILE_PATH"
-          printf 'startTime: "%s"\n' "$START_TIME" >> "$FILE_PATH"
-          printf 'endTime: "%s"\n' "$END_TIME" >> "$FILE_PATH"
+          printf 'startDateTime: "%s"\n' "$START_DATE_TIME" >> "$FILE_PATH"
+          printf 'endDateTime: "%s"\n' "$END_DATE_TIME" >> "$FILE_PATH"
           printf 'location: "%s"\n' "$LOCATION" >> "$FILE_PATH"
           printf 'relevance: "%s"\n' "$EVENT_RELEVANCE" >> "$FILE_PATH"
           printf 'timeZone: "%s"\n' "$EVENT_TIMEZONE" >> "$FILE_PATH"
@@ -86,7 +84,8 @@ jobs:
             --title "New Event Submission: $EVENT_TITLE" \
             --body "This Pull Request adds a new event submitted via the Google Form.
             Event Title: $EVENT_TITLE
-            Date: $EVENT_DATE
+            Start Date and Time: $START_DATE_TIME
+            End Date and Time: $END_DATE_TIME
             Location: $LOCATION
             Relevance to Bioconductor: $EVENT_RELEVANCE
             Timezone: $EVENT_TIMEZONE
