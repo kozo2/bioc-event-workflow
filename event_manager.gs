@@ -28,12 +28,6 @@ const REJECTED_VALUE = "Rejected";
 const GITHUB_TRIGGERED_YES = "Yes";
 // --- END OF CONFIGURATION ---
 
-function convertGmtDateToEquivalentDateInTimezone(gmtDate, targetTimezoneId) {
-  var dateStringInTargetTimezone = Utilities.formatDate(gmtDate, targetTimezoneId, "yyyy-MM-dd'T'HH:mm:ssXXX");
-  var targetDateObject = new Date(dateStringInTargetTimezone);
-  return targetDateObject;
-}
-
 /**
  * Adds a custom menu to the spreadsheet UI.
  */
@@ -110,16 +104,13 @@ function processApprovedEvents() {
       const eventTitle = row[headerMap[HEADER_EVENT_TITLE]];
       Logger.log(`Processing approved event: "${eventTitle}" (Row ${i + 1})`);
 
-      let startDateTime = row[headerMap[HEADER_EVENT_START_DATE_TIME]]; // Get the value
-      console.log("check start data obj");
-      console.log(startDateTime);
-      let endDateTime = row[headerMap[HEADER_EVENT_END_DATE_TIME]]; // Get the value
-      console.log("check end data obj");
-      console.log(endDateTime);
-      const timeZone = row[headerMap[HEADER_EVENT_TIMEZONE]]; // Get the value
+      const startDateTime = row[headerMap[HEADER_EVENT_START_DATE_TIME]]; // Get the value
+      const endDateTime = row[headerMap[HEADER_EVENT_END_DATE_TIME]]; // Get the value
+      const timeZoneOffset = row[headerMap[HEADER_EVENT_TIMEZONE]]; // Get the value
 
-      startDateTime = convertGmtDateToEquivalentDateInTimezone(startDateTime, timeZone);
-      endDateTime = convertGmtDateToEquivalentDateInTimezone(endDateTime, timeZone);
+      var sd = new Date(Utilities.formatDate(startDateTime, "GMT", "yyyy/MM/dd HH:mm:ss") + String(timeZoneOffset));
+      var ed = new Date(Utilities.formatDate(endDateTime, "GMT", "yyyy/MM/dd HH:mm:ss") + String(timeZoneOffset));
+      var timeZone = "GMT" + String(timeZoneOffset);
 
       try {
         // --- 1. Add to Google Calendar (if not already added) ---
@@ -129,7 +120,7 @@ function processApprovedEvents() {
           const description = row[headerMap[HEADER_DESCRIPTION]] || ""; // Handle empty description
           const location = row[headerMap[HEADER_LOCATION_URL]] || ""; // Handle empty location
 
-          const newCalEvent = calendar.createEvent(eventTitle, startDateTime, endDateTime, {
+          const newCalEvent = calendar.createEvent(eventTitle, sd, ed, {
               description: description,
               location: location
             });
@@ -144,16 +135,13 @@ function processApprovedEvents() {
           if (githubTriggered !== GITHUB_TRIGGERED_YES) {
             const eventDataForGitHub = {
               title: eventTitle,
-//              date: Utilities.formatDate(new Date(row[headerMap[HEADER_EVENT_DATE]]), eventTimeZone, "yyyy-MM-dd"),
-              startDateTime: startDateTime,
-              endDateTime: endDateTime,
-//              startTime: startTimeValue instanceof Date ? Utilities.formatDate(startTimeValue, eventTimeZone, "HH:mm:ss") : (typeof startTimeValue === 'string' ? startTimeValue : ""),
-//              endTime: endTimeValue instanceof Date ? Utilities.formatDate(endTimeValue, eventTimeZone, "HH:mm:ss") : (typeof endTimeValue === 'string' ? endTimeValue : ""),
+              startDateTime: Utilities.formatDate(startDateTime, "GMT", "yyyy/MM/dd HH:mm"),
+              endDateTime: Utilities.formatDate(endDateTime, "GMT", "yyyy/MM/dd HH:mm"),
+              timeZone: timeZone, // Added timezone information using Utilities.formatDate validated timezone
               description: row[headerMap[HEADER_DESCRIPTION]] || "",
               location: row[headerMap[HEADER_LOCATION_URL]] || "",
               submitterEmail: row[headerMap[HEADER_SUBMITTER_EMAIL]] || "", // Example of another field
               eventRelevance: row[headerMap[HEADER_EVENT_RELEVANCE]] || "", // Added event relevance information
-              timeZone: timeZone, // Added timezone information using Utilities.formatDate validated timezone
               googleSheetRow: i + 1 // For traceability in GitHub Action
               // Add any other relevant data your GitHub action might need
             };
@@ -288,12 +276,17 @@ function getTimeCellData() {
   var sheet = ss.getSheetByName('Form Responses 1'); // ← Change to your sheet name
 
   // Specify the cell containing the time value.
-  var timeRange = sheet.getRange('K41');    // ← Change to your target cell
+  var timeRange = sheet.getRange('K46');    // ← Change to your target cell
+  var offset = sheet.getRange('L46');
 
   // Get the cell value. If formatted as Time, this returns a Date object.
   var timeValue = timeRange.getValue();
-  console.log(timeValue);
+  const offsetValue = offset.getValue();
+  const val1 = String(offsetValue);
+  const strDate = Utilities.formatDate(timeValue, "GMT", "yyyy/MM/dd HH:mm:ss");
+  var isoString = strDate + val1;
+  console.log(isoString);
+  var dateObj = new Date(isoString);
+  console.log(dateObj);
 
-  // Log the raw Date object.
-  Logger.log('Raw time value (Date object): ' + timeValue.getMinutes());
 } 

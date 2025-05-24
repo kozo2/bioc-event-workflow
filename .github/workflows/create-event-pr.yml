@@ -31,12 +31,12 @@ jobs:
           EVENT_TITLE: ${{ github.event.client_payload.title }}
           START_DATE_TIME: ${{ github.event.client_payload.startDateTime }}
           END_DATE_TIME: ${{ github.event.client_payload.endDateTime }}
+          EVENT_TIMEZONE: ${{ github.event.client_payload.timeZone }}
           DESCRIPTION: ${{ github.event.client_payload.description }}
           LOCATION: ${{ github.event.client_payload.location }}
           SUBMITTER_EMAIL: ${{ github.event.client_payload.submitterEmail }}
           SHEET_ROW: ${{ github.event.client_payload.googleSheetRow }}
-          EVENT_RELEVANCE: ${{ github.event.client_payload.eventRelevance }}
-          EVENT_TIMEZONE: ${{ github.event.client_payload.timeZone }}
+          EVENT_RELEVANCE: ${{ github.event.client_payload.eventRelevance }}          
           # Add other env vars for any other data you pass in client_payload
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -61,9 +61,9 @@ jobs:
           printf 'title: "%s"\n' "$EVENT_TITLE" >> "$FILE_PATH"
           printf 'startDateTime: "%s"\n' "$START_DATE_TIME" >> "$FILE_PATH"
           printf 'endDateTime: "%s"\n' "$END_DATE_TIME" >> "$FILE_PATH"
-          printf 'location: "%s"\n' "$LOCATION" >> "$FILE_PATH"
-          printf 'relevance: "%s"\n' "$EVENT_RELEVANCE" >> "$FILE_PATH"
           printf 'timeZone: "%s"\n' "$EVENT_TIMEZONE" >> "$FILE_PATH"
+          printf 'location: "%s"\n' "$LOCATION" >> "$FILE_PATH"
+          printf 'relevance: "%s"\n' "$EVENT_RELEVANCE" >> "$FILE_PATH"          
           # Add any other frontmatter fields you need
           printf 'sourceSheetRow: %s\n' "$SHEET_ROW" >> "$FILE_PATH" # For traceability
           printf -- '---\n\n' >> "$FILE_PATH"
@@ -86,9 +86,9 @@ jobs:
             Event Title: $EVENT_TITLE
             Start Date and Time: $START_DATE_TIME
             End Date and Time: $END_DATE_TIME
+            Timezone: $EVENT_TIMEZONE
             Location: $LOCATION
             Relevance to Bioconductor: $EVENT_RELEVANCE
-            Timezone: $EVENT_TIMEZONE
             
             Submitted by: $SUBMITTER_EMAIL (if available)
             Original Google Sheet Row: $SHEET_ROW
