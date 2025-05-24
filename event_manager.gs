@@ -178,6 +178,7 @@ for (let i = 1; i < values.length; i++) {
             description: row[headerMap[HEADER_DESCRIPTION]] || "",
             location: row[headerMap[HEADER_LOCATION_URL]] || "",
             submitterEmail: row[headerMap[HEADER_SUBMITTER_EMAIL]] || "", // Example of another field
+            eventRelevance: row[headerMap[HEADER_EVENT_RELEVANCE]] || "", // Added event relevance information
             googleSheetRow: i + 1 // For traceability in GitHub Action
             // Add any other relevant data your GitHub action might need
           };
@@ -289,6 +290,7 @@ function testGitHubDispatch() {
     endTime: "11:00:00",
     description: "This is a test event triggered manually to check GitHub dispatch.",
     location: "Virtual Test",
+    eventRelevance: "Test event relevance for Bioconductor community",
     message: "Testing repository_dispatch from Google Apps Script " + new Date().toISOString()
   };
 
