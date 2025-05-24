@@ -29,18 +29,57 @@ const REJECTED_VALUE = "Rejected";
 const GITHUB_TRIGGERED_YES = "Yes";
 // --- END OF CONFIGURATION ---
 
-/** * Helper function to create a timezone-aware Date object. * @param {Date} eventDate The date of the event. * @param {string|Date} timeValue The time value (either string in HH:mm format or Date object). * @param {string} timeZone The timezone string (e.g., "America/New_York", "UTC", etc.). * @return {Date} A Date object adjusted for the specified timezone. */function createTimezoneAwareDate(eventDate, timeValue, timeZone) {  let hours = 0, minutes = 0, seconds = 0;    // Extract time components  if (timeValue instanceof Date) {    hours = timeValue.getHours();    minutes = timeValue.getMinutes();    seconds = timeValue.getSeconds();  } else if (typeof timeValue === 'string' && timeValue.match(/\d{1,2}:\d{2}/)) {    [hours, minutes] = timeValue.split(':').map(Number);  } else {    throw new Error(`Invalid time value: ${timeValue}`);  }    // Validate timezone  let validTimeZone = timeZone;  try {    // Test if the timezone is valid by trying to format a date with it    Utilities.formatDate(new Date(), timeZone, "yyyy-MM-dd");  } catch (e) {    Logger.log(`Warning: Invalid timezone "${timeZone}". Using script timezone as fallback.`);    validTimeZone = Session.getScriptTimeZone();  }    // Create a local date object for the specified date and time  // This assumes the input time is in the specified timezone  const localDate = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hours, minutes, seconds);    // Log the timezone conversion for debugging  Logger.log(`Created date: ${localDate} for timezone: ${validTimeZone}`);    return localDate;}
+/**
+ * Helper function to create a timezone-aware Date object.
+ * @param {Date} eventDate The date of the event.
+ * @param {string|Date} timeValue The time value (either string in HH:mm format or Date object).
+ * @param {string} timeZone The timezone string (e.g., "America/New_York", "UTC", etc.).
+ * @return {Date} A Date object adjusted for the specified timezone.
+ */
+function createTimezoneAwareDate(eventDate, timeValue, timeZone) {
+  let hours = 0, minutes = 0, seconds = 0;
+  
+  // Extract time components
+  if (timeValue instanceof Date) {
+    hours = timeValue.getHours();
+    minutes = timeValue.getMinutes();
+    seconds = timeValue.getSeconds();
+  } else if (typeof timeValue === 'string' && timeValue.match(/\d{1,2}:\d{2}/)) {
+    [hours, minutes] = timeValue.split(':').map(Number);
+  } else {
+    throw new Error(`Invalid time value: ${timeValue}`);
+  }
+  
+  // Validate timezone
+  let validTimeZone = timeZone;
+  try {
+    // Test if the timezone is valid by trying to format a date with it
+    Utilities.formatDate(new Date(), timeZone, "yyyy-MM-dd");
+  } catch (e) {
+    Logger.log(`Warning: Invalid timezone "${timeZone}". Using script timezone as fallback.`);
+    validTimeZone = Session.getScriptTimeZone();
+  }
+  
+  // Create a local date object for the specified date and time
+  // This assumes the input time is in the specified timezone
+  const localDate = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hours, minutes, seconds);
+  
+  // Log the timezone conversion for debugging
+  Logger.log(`Created date: ${localDate} for timezone: ${validTimeZone}`);
+  
+  return localDate;
+}
 
 /**
  * Adds a custom menu to the spreadsheet UI.
  */
 function onOpen() {
-SpreadsheetApp.getUi()
-  .createMenu('Bioconductor Event Workflow')
-  .addItem('1. Process Approved Events', 'processApprovedEvents')
-  .addSeparator()
-  .addItem('Test GitHub Dispatch', 'testGitHubDispatch') // For testing GitHub connection
-  .addToUi();
+  SpreadsheetApp.getUi()
+    .createMenu('Bioconductor Event Workflow')
+    .addItem('1. Process Approved Events', 'processApprovedEvents')
+    .addSeparator()
+    .addItem('Test GitHub Dispatch', 'testGitHubDispatch') // For testing GitHub connection
+    .addToUi();
 }
 
 /**
@@ -48,137 +87,175 @@ SpreadsheetApp.getUi()
  * create calendar entries, and trigger GitHub actions.
  */
 function processApprovedEvents() {
-const ui = SpreadsheetApp.getUi();
-const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
 
-if (!sheet) {
-  ui.alert(`Sheet "${SHEET_NAME}" not found. Please check configuration.`);
-  Logger.log(`Sheet "${SHEET_NAME}" not found.`);
-  return;
-}
-
-const dataRange = sheet.getDataRange();
-const values = dataRange.getValues();
-const headers = values[0];
-const headerMap = getHeaderMap(headers);
-
-// Validate required columns
-const requiredManualHeaders = [HEADER_APPROVAL_STATUS, HEADER_CALENDAR_EVENT_ID, HEADER_GITHUB_TRIGGERED, HEADER_PROCESSED_TIMESTAMP, HEADER_EVENT_RELEVANCE, HEADER_TIMEZONE];
-for (const header of requiredManualHeaders) {
-  if (headerMap[header] === undefined) {
-    ui.alert(`Error: Critical column "${header}" not found in sheet. Please add it and re-run.`);
-    Logger.log(`Error: Critical column "${header}" not found in sheet.`);
+  if (!sheet) {
+    ui.alert(`Sheet "${SHEET_NAME}" not found. Please check configuration.`);
+    Logger.log(`Sheet "${SHEET_NAME}" not found.`);
     return;
   }
-}
+
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+  const headers = values[0];
+  const headerMap = getHeaderMap(headers);
+
+  // Validate required columns
+  const requiredManualHeaders = [HEADER_APPROVAL_STATUS, HEADER_CALENDAR_EVENT_ID, HEADER_GITHUB_TRIGGERED, HEADER_PROCESSED_TIMESTAMP, HEADER_EVENT_RELEVANCE, HEADER_TIMEZONE];
+  for (const header of requiredManualHeaders) {
+    if (headerMap[header] === undefined) {
+      ui.alert(`Error: Critical column "${header}" not found in sheet. Please add it and re-run.`);
+      Logger.log(`Error: Critical column "${header}" not found in sheet.`);
+      return;
+    }
+  }
   const requiredFormHeaders = [HEADER_EVENT_TITLE, HEADER_EVENT_DATE, HEADER_START_TIME, HEADER_END_TIME, HEADER_DESCRIPTION, ];
   for (const header of requiredFormHeaders) {
-  if (headerMap[header] === undefined) {
-    ui.alert(`Error: Expected form column "${header}" not found in sheet. Please check form and sheet column names.`);
-    Logger.log(`Error: Expected form column "${header}" not found in sheet.`);
-    return;
-  }
-}
-
-
-const calendar = CalendarApp.getCalendarById(CALENDAR_ID);
-if (!calendar) {
-  ui.alert(`Google Calendar with ID "${CALENDAR_ID}" not found or inaccessible. Check CALENDAR_ID and permissions.`);
-  Logger.log(`Google Calendar with ID "${CALENDAR_ID}" not found.`);
-  return;
-}
-
-let eventsProcessedCount = 0;
-let errorsEncountered = 0;
-
-// Iterate over rows, skipping header row (index 0)
-for (let i = 1; i < values.length; i++) {
-  const row = values[i];
-  const approvalStatus = row[headerMap[HEADER_APPROVAL_STATUS]];
-  const calendarEventId = row[headerMap[HEADER_CALENDAR_EVENT_ID]];
-  const githubTriggered = row[headerMap[HEADER_GITHUB_TRIGGERED]];
-  const processedTimestamp = row[headerMap[HEADER_PROCESSED_TIMESTAMP]];
-
-  // Check if event is approved and not fully processed yet
-  if (approvalStatus === APPROVED_VALUE && !processedTimestamp) {
-    
-    Logger.log(row);
-    
-    const eventRelevance = row[headerMap[HEADER_EVENT_RELEVANCE]];
-    const eventTitle = row[headerMap[HEADER_EVENT_TITLE]];
-    Logger.log(`Processing approved event: "${eventTitle}" (Row ${i + 1})`);
-
-    let startTimeValue = row[headerMap[HEADER_START_TIME]]; // Get the value
-    let endTimeValue = row[headerMap[HEADER_END_TIME]];      // Get the value
-    const timeZone = row[headerMap[HEADER_TIMEZONE]];
-
-    try {
-      // --- 1. Add to Google Calendar (if not already added) ---
-      let currentCalendarEventId = calendarEventId;
-      if (!calendarEventId) {
-        const eventDate = new Date(row[headerMap[HEADER_EVENT_DATE]]);        
-        const description = row[headerMap[HEADER_DESCRIPTION]] || ""; // Handle empty description
-        const location = row[headerMap[HEADER_LOCATION_URL]] || ""; // Handle empty location
-
-        if (isNaN(eventDate.getTime())) {
-          throw new Error(`Invalid Event Date for "${eventTitle}"`);
-        }
-
-        let startDateTime, endDateTime;                // Validate and use timezone information        const eventTimeZone = timeZone || Session.getScriptTimeZone();        Logger.log(`Creating event in timezone: ${eventTimeZone}`);        // Construct startDateTime with timezone awareness        try {          if (startTimeValue instanceof Date || (typeof startTimeValue === 'string' && startTimeValue.match(/\d{1,2}:\d{2}/))) {            startDateTime = createTimezoneAwareDate(eventDate, startTimeValue, eventTimeZone);          } else {            Logger.log(`Warning: Start time for "${eventTitle}" is invalid or missing. Creating as all-day event for the specified date.`);            startDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());            // For all-day, endDateTime is the beginning of the next day. CalendarApp handles this.            endDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate() + 1);          }        } catch (e) {          Logger.log(`Error creating timezone-aware start time for "${eventTitle}": ${e.message}. Falling back to default timezone.`);          // Fallback to original logic          if (startTimeValue instanceof Date) {            startDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(),                                      startTimeValue.getHours(), startTimeValue.getMinutes(), startTimeValue.getSeconds());          } else if (typeof startTimeValue === 'string' && startTimeValue.match(/\d{1,2}:\d{2}/)) {            const [hours, minutes] = startTimeValue.split(':').map(Number);            startDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hours, minutes);          } else {            startDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());            endDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate() + 1);          }        }        // Construct endDateTime (only if not an all-day event from above)        if (endDateTime === undefined) { // i.e. not set as all day above          try {            if (endTimeValue instanceof Date || (typeof endTimeValue === 'string' && endTimeValue.match(/\d{1,2}:\d{2}/))) {              endDateTime = createTimezoneAwareDate(eventDate, endTimeValue, eventTimeZone);            } else {              Logger.log(`Warning: End time for "${eventTitle}" is invalid or missing. Defaulting to 1 hour duration from start time.`);              endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1 hour later            }          } catch (e) {            Logger.log(`Error creating timezone-aware end time for "${eventTitle}": ${e.message}. Falling back to default logic.`);            // Fallback to original logic            if (endTimeValue instanceof Date) {              endDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(),                                    endTimeValue.getHours(), endTimeValue.getMinutes(), endTimeValue.getSeconds());            } else if (typeof endTimeValue === 'string' && endTimeValue.match(/\d{1,2}:\d{2}/)) {              const [hours, minutes] = endTimeValue.split(':').map(Number);              endDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hours, minutes);            } else {              endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1 hour later            }          }        }
-
-
-          if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime()) || endDateTime <= startDateTime) {
-            throw new Error(`Invalid start/end time for "${eventTitle}". Start: ${startDateTime}, End: ${endDateTime}`);
-          }
-
-          const newCalEvent = calendar.createEvent(eventTitle, startDateTime, endDateTime, {
-            description: description,
-            location: location
-          });
-          currentCalendarEventId = newCalEvent.getId();
-          sheet.getRange(i + 1, headerMap[HEADER_CALENDAR_EVENT_ID] + 1).setValue(currentCalendarEventId);
-          Logger.log(`Event "${eventTitle}" added to calendar. ID: ${currentCalendarEventId}`);
-        } else {
-          Logger.log(`Event "${eventTitle}" already has a Calendar ID: ${calendarEventId}. Skipping calendar creation.`);
-        }
-
-        // --- 2. Trigger GitHub Action (if not already triggered) ---
-        if (githubTriggered !== GITHUB_TRIGGERED_YES) {
-                    const eventDataForGitHub = {            title: eventTitle,            date: Utilities.formatDate(new Date(row[headerMap[HEADER_EVENT_DATE]]), Session.getScriptTimeZone(), "yyyy-MM-dd"),            startTime: startTimeValue instanceof Date ? Utilities.formatDate(startTimeValue, Session.getScriptTimeZone(), "HH:mm:ss") : (typeof startTimeValue === 'string' ? startTimeValue : ""),            endTime: endTimeValue instanceof Date ? Utilities.formatDate(endTimeValue, Session.getScriptTimeZone(), "HH:mm:ss") : (typeof endTimeValue === 'string' ? endTimeValue : ""),            description: row[headerMap[HEADER_DESCRIPTION]] || "",            location: row[headerMap[HEADER_LOCATION_URL]] || "",            submitterEmail: row[headerMap[HEADER_SUBMITTER_EMAIL]] || "", // Example of another field            eventRelevance: row[headerMap[HEADER_EVENT_RELEVANCE]] || "", // Added event relevance information            timeZone: timeZone || Session.getScriptTimeZone(), // Added timezone information            googleSheetRow: i + 1 // For traceability in GitHub Action            // Add any other relevant data your GitHub action might need          };
-
-          const ghResponse = triggerRepositoryDispatch(eventDataForGitHub);
-          if (ghResponse.getResponseCode() === 204) { // 204 No Content is success for dispatch
-            sheet.getRange(i + 1, headerMap[HEADER_GITHUB_TRIGGERED] + 1).setValue(GITHUB_TRIGGERED_YES);
-            Logger.log(`GitHub Action triggered successfully for "${eventTitle}".`);
-          } else {
-            throw new Error(`GitHub Action trigger failed for "${eventTitle}". Code: ${ghResponse.getResponseCode()}. Response: ${ghResponse.getContentText()}`);
-          }
-        } else {
-           Logger.log(`GitHub Action already triggered for "${eventTitle}". Skipping trigger.`);
-        }
-
-        // --- 3. Mark as fully processed ---
-        sheet.getRange(i + 1, headerMap[HEADER_PROCESSED_TIMESTAMP] + 1).setValue(new Date());
-        eventsProcessedCount++;
-
-      } catch (e) {
-        errorsEncountered++;
-        Logger.log(`ERROR processing row ${i + 1} ("${eventTitle}"): ${e.message} \nStack: ${e.stack || 'No stack'}`);
-        // Optionally, mark the row with an error status in a new "Error Message" column
-        // sheet.getRange(i + 1, headerMap["Error Message"] + 1).setValue(e.message);
-      }
+    if (headerMap[header] === undefined) {
+      ui.alert(`Error: Expected form column "${header}" not found in sheet. Please check form and sheet column names.`);
+      Logger.log(`Error: Expected form column "${header}" not found in sheet.`);
+      return;
     }
   }
 
-  let summaryMessage = `${eventsProcessedCount} event(s) processed successfully.`;
-  if (errorsEncountered > 0) {
-    summaryMessage += `\n${errorsEncountered} error(s) occurred. Check logs for details.`;
+  const calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+  if (!calendar) {
+    ui.alert(`Google Calendar with ID "${CALENDAR_ID}" not found or inaccessible. Check CALENDAR_ID and permissions.`);
+    Logger.log(`Google Calendar with ID "${CALENDAR_ID}" not found.`);
+    return;
   }
-  if (eventsProcessedCount === 0 && errorsEncountered === 0) {
-    summaryMessage = "No new 'Approved' events found to process.";
-  }
-  ui.alert(summaryMessage);
-  Logger.log(summaryMessage);
+
+  let eventsProcessedCount = 0;
+  let errorsEncountered = 0;
+
+  // Iterate over rows, skipping header row (index 0)
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const approvalStatus = row[headerMap[HEADER_APPROVAL_STATUS]];
+    const calendarEventId = row[headerMap[HEADER_CALENDAR_EVENT_ID]];
+    const githubTriggered = row[headerMap[HEADER_GITHUB_TRIGGERED]];
+    const processedTimestamp = row[headerMap[HEADER_PROCESSED_TIMESTAMP]];
+
+    // Check if event is approved and not fully processed yet
+    if (approvalStatus === APPROVED_VALUE && !processedTimestamp) {
+      
+      Logger.log(row);
+      
+      const eventRelevance = row[headerMap[HEADER_EVENT_RELEVANCE]];
+      const eventTitle = row[headerMap[HEADER_EVENT_TITLE]];
+      Logger.log(`Processing approved event: "${eventTitle}" (Row ${i + 1})`);
+
+      let startTimeValue = row[headerMap[HEADER_START_TIME]]; // Get the value
+      let endTimeValue = row[headerMap[HEADER_END_TIME]];      // Get the value
+      const timeZone = row[headerMap[HEADER_TIMEZONE]];
+
+      try {
+        // --- 1. Add to Google Calendar (if not already added) ---
+        let currentCalendarEventId = calendarEventId;
+        if (!calendarEventId) {
+          const eventDate = new Date(row[headerMap[HEADER_EVENT_DATE]]);        
+          const description = row[headerMap[HEADER_DESCRIPTION]] || ""; // Handle empty description
+          const location = row[headerMap[HEADER_LOCATION_URL]] || ""; // Handle empty location
+
+          if (isNaN(eventDate.getTime())) {
+            throw new Error(`Invalid Event Date for "${eventTitle}"`);
+          }
+
+          let startDateTime, endDateTime;
+
+          // Construct startDateTime
+          if (startTimeValue instanceof Date) { // If Google Sheets automatically converted to full Date object with time
+            startDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(),
+                                      startTimeValue.getHours(), startTimeValue.getMinutes(), startTimeValue.getSeconds());
+          } else if (typeof startTimeValue === 'string' && startTimeValue.match(/\d{1,2}:\d{2}/)) { // HH:mm format
+            const [hours, minutes] = startTimeValue.split(':').map(Number);
+            startDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hours, minutes);
+          } else { // Assume all-day or handle error if time is mandatory and invalid
+              Logger.log(`Warning: Start time for "${eventTitle}" is invalid or missing. Creating as all-day event for the specified date.`);
+              startDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+              // For all-day, endDateTime is the beginning of the next day. CalendarApp handles this.
+              endDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate() + 1);
+          }
+
+          // Construct endDateTime (only if not an all-day event from above)
+          if (endDateTime === undefined) { // i.e. not set as all day above
+            if (endTimeValue instanceof Date) {
+                endDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(),
+                                      endTimeValue.getHours(), endTimeValue.getMinutes(), endTimeValue.getSeconds());
+            } else if (typeof endTimeValue === 'string' && endTimeValue.match(/\d{1,2}:\d{2}/)) {
+                const [hours, minutes] = endTimeValue.split(':').map(Number);
+                endDateTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hours, minutes);
+            }  else {
+                  Logger.log(`Warning: End time for "${eventTitle}" is invalid or missing. Defaulting to 1 hour duration from start time.`);
+                  endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1 hour later
+              }
+            }
+
+            if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime()) || endDateTime <= startDateTime) {
+              throw new Error(`Invalid start/end time for "${eventTitle}". Start: ${startDateTime}, End: ${endDateTime}`);
+            }
+
+            const newCalEvent = calendar.createEvent(eventTitle, startDateTime, endDateTime, {
+              description: description,
+              location: location
+            });
+            currentCalendarEventId = newCalEvent.getId();
+            sheet.getRange(i + 1, headerMap[HEADER_CALENDAR_EVENT_ID] + 1).setValue(currentCalendarEventId);
+            Logger.log(`Event "${eventTitle}" added to calendar. ID: ${currentCalendarEventId}`);
+          } else {
+            Logger.log(`Event "${eventTitle}" already has a Calendar ID: ${calendarEventId}. Skipping calendar creation.`);
+          }
+
+          // --- 2. Trigger GitHub Action (if not already triggered) ---
+          if (githubTriggered !== GITHUB_TRIGGERED_YES) {
+            const eventDataForGitHub = {
+              title: eventTitle,
+              date: Utilities.formatDate(new Date(row[headerMap[HEADER_EVENT_DATE]]), Session.getScriptTimeZone(), "yyyy-MM-dd"),
+              startTime: startTimeValue instanceof Date ? Utilities.formatDate(startTimeValue, Session.getScriptTimeZone(), "HH:mm:ss") : (typeof startTimeValue === 'string' ? startTimeValue : ""),
+              endTime: endTimeValue instanceof Date ? Utilities.formatDate(endTimeValue, Session.getScriptTimeZone(), "HH:mm:ss") : (typeof endTimeValue === 'string' ? endTimeValue : ""),
+              description: row[headerMap[HEADER_DESCRIPTION]] || "",
+              location: row[headerMap[HEADER_LOCATION_URL]] || "",
+              submitterEmail: row[headerMap[HEADER_SUBMITTER_EMAIL]] || "", // Example of another field
+              eventRelevance: row[headerMap[HEADER_EVENT_RELEVANCE]] || "", // Added event relevance information
+              timeZone: timeZone || Session.getScriptTimeZone(), // Added timezone information
+              googleSheetRow: i + 1 // For traceability in GitHub Action
+              // Add any other relevant data your GitHub action might need
+            };
+
+            const ghResponse = triggerRepositoryDispatch(eventDataForGitHub);
+            if (ghResponse.getResponseCode() === 204) { // 204 No Content is success for dispatch
+              sheet.getRange(i + 1, headerMap[HEADER_GITHUB_TRIGGERED] + 1).setValue(GITHUB_TRIGGERED_YES);
+              Logger.log(`GitHub Action triggered successfully for "${eventTitle}".`);
+            } else {
+              throw new Error(`GitHub Action trigger failed for "${eventTitle}". Code: ${ghResponse.getResponseCode()}. Response: ${ghResponse.getContentText()}`);
+            }
+          } else {
+             Logger.log(`GitHub Action already triggered for "${eventTitle}". Skipping trigger.`);
+          }
+
+          // --- 3. Mark as fully processed ---
+          sheet.getRange(i + 1, headerMap[HEADER_PROCESSED_TIMESTAMP] + 1).setValue(new Date());
+          eventsProcessedCount++;
+
+        } catch (e) {
+          errorsEncountered++;
+          Logger.log(`ERROR processing row ${i + 1} ("${eventTitle}"): ${e.message} \nStack: ${e.stack || 'No stack'}`);
+          // Optionally, mark the row with an error status in a new "Error Message" column
+          // sheet.getRange(i + 1, headerMap["Error Message"] + 1).setValue(e.message);
+        }
+      }
+    }
+
+    let summaryMessage = `${eventsProcessedCount} event(s) processed successfully.`;
+    if (errorsEncountered > 0) {
+      summaryMessage += `\n${errorsEncountered} error(s) occurred. Check logs for details.`;
+    }
+    if (eventsProcessedCount === 0 && errorsEncountered === 0) {
+      summaryMessage = "No new 'Approved' events found to process.";
+    }
+    ui.alert(summaryMessage);
+    Logger.log(summaryMessage);
 }
 
 /**
@@ -245,8 +322,17 @@ function testGitHubDispatch() {
     return;
   }
 
-
-    const testPayload = {    title: "Test Event from Apps Script",    date: "2025-12-31",    startTime: "10:00:00",    endTime: "11:00:00",    description: "This is a test event triggered manually to check GitHub dispatch.",    location: "Virtual Test",    eventRelevance: "Test event relevance for Bioconductor community",    timeZone: "America/New_York",    message: "Testing repository_dispatch from Google Apps Script " + new Date().toISOString()  };
+  const testPayload = {
+    title: "Test Event from Apps Script",
+    date: "2025-12-31",
+    startTime: "10:00:00",
+    endTime: "11:00:00",
+    description: "This is a test event triggered manually to check GitHub dispatch.",
+    location: "Virtual Test",
+    eventRelevance: "Test event relevance for Bioconductor community",
+    timeZone: "America/New_York",
+    message: "Testing repository_dispatch from Google Apps Script " + new Date().toISOString()
+  };
 
   try {
     const response = triggerRepositoryDispatch(testPayload);
@@ -274,5 +360,4 @@ function getTimeCellData() {
 
   // Log the raw Date object.
   Logger.log('Raw time value (Date object): ' + timeValue.getMinutes());
-
 }
